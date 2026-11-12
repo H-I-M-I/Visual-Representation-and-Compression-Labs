@@ -1,45 +1,217 @@
-# Lab 1 - Sampling, Color and Information in Images
 
-[Open the notebook](DT096A_Lab1.ipynb)
+# Digital Image Representation and Coding
 
-This notebook follows the progression from how an image is sampled to how redundancy appears in image data. The main comparisons use `skimage.data.camera()` and a separately loaded color photograph. The notebook still contains the original plots and printed measurements.
+**Course:** Multidimensional Visual Representation and Compression
+**University:** Mid Sweden University
 
-## 3.1 Sampling and aliasing
+This lab explores how digital images are represented through sampling, quantization, color components, and statistical properties. The experiments use a standard grayscale test image and a separate color photograph to examine how reducing image information affects visual quality and how relationships between pixels can be used for more efficient representation.
 
-The camera image is downsampled by **2, 4 and 8**. Results without prefiltering are compared with results using a Gaussian filter before resizing. The image and Fourier magnitude-spectrum plots help show what happens to fine detail and high-frequency content. A second comparison repeats the experiment on a grayscale version of the personal photograph.
+## 1. Image Sampling and Aliasing
 
-**What to look for:** filtering before downsampling reduces the high-frequency content that can fold into lower frequencies. The cost is some smoothing, so the comparison is not simply about which picture looks sharper.
+### 1.1 Downsampling the grayscale image
 
-## 3.2 Quantization and SQNR
+The `512 × 512` camera image was used to study the effect of reducing spatial resolution.
 
-Uniform quantization is tested at **1, 2, 3, 4, 6 and 8 bits**. The implementation rounds normalized intensities to one of `2^bits` representable levels. Reconstruction error, mean-squared error (MSE) and signal-to-quantization-noise ratio (SQNR) are measured. Plots compare the measured SQNR increase with a reference slope of roughly **6 dB per bit**. Similar tests are carried out for the color photograph.
+Downsampling was performed using factors of **2, 4, and 8**, initially by selecting every second, fourth, or eighth pixel.
 
-**What to look for:** the lower-bit results show much more visible banding; more quantization levels generally reduce distortion. The 6 dB line is a useful reference, not a guaranteed exact measurement on every image.
+Two approaches were compared:
 
-## 3.3 Color representation and chroma subsampling
+- Downsampling without prefiltering.
+- Downsampling after applying a Gaussian low-pass filter.
 
-The color photo is converted to **YCbCr**, separating luminance from chroma. The chroma planes are then reduced using **4:2:2** and **4:2:0** patterns and resized for reconstruction. The notebook compares reconstructed **4:4:4, 4:2:2 and 4:2:0** images side by side.
+For the filtered images, the Gaussian standard deviation was set to half the downsampling factor (`sigma = factor / 2`).
 
-**What to look for:** chroma can often be reduced more aggressively than brightness without an equally large perceived loss, although fine color boundaries can suffer.
+The resulting images were compared visually to observe how image details changed as fewer samples were retained.
 
-## 4. Information theory and prediction
+Without prefiltering, downsampling introduced aliasing, particularly around edges and fine image structures. Gaussian filtering reduced these effects by suppressing high-frequency components before sampling, although some sharpness was lost.
 
-The final section looks at information content in a few ways:
+### 1.2 Frequency-domain analysis
 
-- Entropy of fair and biased dice, including joint entropy
-- Pixel-value entropy and i.i.d. sequence experiments
-- Joint/conditional entropy and mutual-information calculations for neighboring pixels and synthetic data
-- A spatial predictor based on the average of the left and upper pixels, with prediction residuals
-- Autoregressive **AR(1)** sequences, including comparisons across different correlation parameters
+The Fourier magnitude spectrum was calculated to examine how downsampling affected image frequencies.
 
-These experiments connect image redundancy with the idea behind predictive coding: when nearby values are related, the residual may be easier to describe than the original value.
+The original and downsampled images were compared using log-magnitude spectra.
 
-## Opening or running
+The frequency-domain results helped explain the visual differences between filtered and unfiltered downsampling, particularly the importance of limiting high-frequency content before reducing the sampling rate.
 
-The notebook can be opened on GitHub with its saved figures intact. To rerun the sections involving the personal photograph, replace the Google Drive path `/content/drive/MyDrive/DT096A_Lab1/image-1.jpeg` with the location of an image available in the runtime. The original personal photograph was not included in the uploaded files, so it is **not** silently replaced with another image.
+### 1.3 Sampling a color photograph
 
-Dependencies: `numpy`, `matplotlib`, `Pillow`, `scikit-image`, `opencv-python`; the notebook also uses Colab Drive mounting for the personal photo. Execute cells in order because some later cells reuse previously defined variables.
+The same downsampling factors were applied to a separate photograph after converting it to grayscale.
 
-## A practical note
+This provided another comparison using an image containing different textures, boundaries, and fine details.
 
-The notebook contains exploratory cells as well as the main experiment sections. They have been retained with their outputs rather than rewriting the workflow into a new experiment after the fact.
+A more focused comparison was also performed for downsampling by a factor of 4, including the corresponding frequency spectra.
+
+## 2. Image Quantization
+
+### 2.1 Uniform grayscale quantization
+
+The grayscale camera image was quantized using:
+
+- 1 bit
+- 2 bits
+- 3 bits
+- 4 bits
+- 6 bits
+- 8 bits
+
+The image intensities were first normalized to the range `[0, 1]`.
+
+For each bit depth, the available intensity values were restricted to `2^bits` uniformly spaced reconstruction levels.
+
+The quantization operation was implemented using:
+
+```python
+M = 2 ** bits
+quantized = np.round(np.clip(image, 0, 1) * (M - 1)) / (M - 1)
+```
+
+The reconstructed images were displayed together to compare the effect of reducing the number of intensity levels.
+
+At lower bit depths, smooth intensity transitions became less continuous, producing visible banding and loss of tonal detail. Increasing the bit depth reduced these effects.
+
+### 2.2 Quantization error and SQNR
+
+Quantization performance was evaluated using:
+
+- Mean Squared Error (MSE)
+- Signal-to-Quantization-Noise Ratio (SQNR)
+
+MSE measures the average squared difference between the original and quantized images.
+
+SQNR compares the average signal power with the average quantization-error power.
+
+Both measurements were calculated for the tested bit depths and plotted to examine how reconstruction quality changed.
+
+A theoretical reference trend of approximately **6 dB SQNR improvement per additional bit** was also included for comparison.
+
+This reference describes an approximate high-resolution quantization trend rather than an exact result for every image.
+
+### 2.3 Color image quantization
+
+The color photograph was quantized by applying the same uniform quantization procedure independently to its RGB channels.
+
+Reconstructed images using **2, 4, and 8 bits per channel** were displayed.
+
+MSE and SQNR were calculated for the tested bit depths, and the measured SQNR values were compared with the theoretical reference trend.
+
+A separate plot excluding the 8-bit endpoint was used to examine the lower-bit-depth measurements more clearly.
+
+## 3. Color Representation and Chroma Subsampling
+
+### 3.1 RGB to YCbCr conversion
+
+The color photograph was converted from RGB to YCbCr.
+
+The three components were examined separately:
+
+- **Y:** Luminance information
+- **Cb:** Blue-difference chroma information
+- **Cr:** Red-difference chroma information
+
+Displaying the components separately helped distinguish the image's brightness structure from its color information.
+
+### 3.2 Chroma subsampling
+
+Three chroma sampling arrangements were compared.
+
+| Format | Implementation |
+|---|---|
+| 4:4:4 | Full-resolution luminance and chroma |
+| 4:2:2 | Horizontal pairs of chroma samples averaged |
+| 4:2:0 | Chroma samples averaged over 2 × 2 neighborhoods |
+
+For the subsampled versions, the reduced chroma components were resized back to their original dimensions before conversion to RGB.
+
+The reconstructed color images were then compared visually.
+
+Reducing chroma resolution affected color detail, particularly around small colored boundaries, while the luminance component retained its original spatial resolution.
+
+## 4. Information Theory and Image Entropy
+
+### 4.1 Entropy of probability distributions
+
+Shannon entropy was calculated using:
+
+\[
+H(X)=-\sum_i p_i\log_2 p_i
+\]
+
+The entropy function was tested using two probability distributions:
+
+- A fair six-sided die.
+- A biased six-sided die with probabilities `[0.10, 0.20, 0.10, 0.20, 0.20, 0.20]`.
+
+The experiment compared uncertainty in uniform and nonuniform distributions.
+
+Joint probability distributions were also constructed for independent dice to examine the relationship between individual and joint entropy.
+
+### 4.2 Image entropy and histograms
+
+Pixel histograms were calculated for the grayscale camera image and the grayscale version of the color photograph.
+
+The normalized histograms were used as probability distributions for estimating image entropy.
+
+A sequence of **100,000 independent samples** was also generated from an image histogram.
+
+The experiment compared image pixel statistics with an independently sampled sequence having the same marginal intensity distribution.
+
+This helped separate the information contained in an intensity histogram from the spatial relationships between neighboring pixels.
+
+### 4.3 Joint entropy, conditional entropy, and mutual information
+
+Horizontally neighboring pixel pairs were extracted from the grayscale photograph.
+
+Their joint distribution was used to estimate:
+
+- Joint entropy
+- Conditional entropy
+- Mutual information
+
+These measurements were used to examine how much information neighboring pixels share.
+
+Additional synthetic experiments with independent and dependent random variables were included to compare different levels of statistical dependence.
+
+## 5. Predictive Coding
+
+### 5.1 Spatial prediction
+
+A simple image predictor was implemented using the average of the left and upper neighboring pixels.
+
+The predicted value was calculated from previously available neighboring samples.
+
+Prediction residuals were obtained by subtracting the predicted values from the original pixel values.
+
+The residual image was displayed, and its statistical distribution and entropy were examined.
+
+Because nearby image pixels are often correlated, prediction can reduce redundancy by representing the differences between pixels rather than their original intensities.
+
+The original image and prediction residuals were compared to examine this effect.
+
+### 5.2 Correlated AR(1) sequences
+
+Autoregressive sequences were generated to study how correlation affects statistical behavior and predictability.
+
+The experiments used sequences containing **100,000 samples**.
+
+An initial experiment used `alpha = 0.9`, followed by comparisons with:
+
+- `alpha = 0.2`
+- `alpha = 0.5`
+- `alpha = 0.9`
+- `alpha = 0.99`
+
+Changing the correlation parameter made it possible to observe how strongly each sample depended on the preceding sample.
+
+These experiments provided a simple statistical comparison with the dependencies observed between neighboring image pixels.
+
+## Main Observations
+
+The experiments showed how different representation methods affect the information retained in an image.
+
+Sampling without sufficient filtering introduced aliasing, while Gaussian prefiltering reduced these artifacts at the cost of some detail.
+
+Quantization reduced the number of available intensity values, with lower bit depths producing more visible distortion and higher quantization error.
+
+Chroma subsampling demonstrated that color resolution can be reduced separately from luminance resolution.
+
+The entropy and prediction experiments showed how statistical dependencies between neighboring pixels can be used to reduce redundancy, which is an important idea behind predictive image coding.
